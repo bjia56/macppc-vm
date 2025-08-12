@@ -40,7 +40,7 @@ runs:
       run: |
         # Download disk image
         OUT="${{ github.action_path }}/disk"
-        wget "${{ inputs.vm_image }}" -O "$OUT" || cp "${{ inputs.vm_image }}" "$OUT"
+        wget -q "${{ inputs.vm_image }}" -O "$OUT" || cp "${{ inputs.vm_image }}" "$OUT"
 
         if [ ! -f "$OUT" ]; then
           echo "Failed to download or copy disk image"
