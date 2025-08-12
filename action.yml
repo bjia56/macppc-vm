@@ -32,26 +32,15 @@ runs:
       run: |
         # Install dependencies
         sudo apt-get update -qq > /dev/null
-        sudo apt-get install -y -qq qemu-system-ppc xvfb ssh python3 file > /dev/null
+        sudo apt-get install -y -qq qemu-system-ppc xvfb ssh file > /dev/null
         qemu-system-ppc --version
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-
-    - name: Setup downloader
-      shell: bash
-      run: |
-        # Setup downloader
-        python -m pip install gdown
 
     - name: Download disk
       shell: bash
       run: |
         # Download disk image
         OUT="${{ github.action_path }}/disk"
-        gdown -q --fuzzy "${{ inputs.vm_image }}" -O "$OUT" || wget -q "${{ inputs.vm_image }}" -O "$OUT" || curl -s -L "${{ inputs.vm_image }}" -o "$OUT" || cp "${{ inputs.vm_image }}" "$OUT" || echo "Failed to download or copy disk image"
+        wget "${{ inputs.vm_image }}" -O "$OUT" || cp "${{ inputs.vm_image }}" "$OUT"
 
         if [ ! -f "$OUT" ]; then
           echo "Failed to download or copy disk image"
