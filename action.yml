@@ -47,7 +47,7 @@ runs:
       run: |
         # Download disk image
         OUT="${{ github.action_path }}/disk"
-        gdown --fuzzy "${{ inputs.vm_image }}" -O "$OUT" || wget "${{ inputs.vm_image }}" -O "$OUT" || curl -L "${{ inputs.vm_image }}" -o "$OUT" || cp "${{ inputs.vm_image }}" "$OUT" || echo "Failed to download or copy disk image"
+        gdown -q --fuzzy "${{ inputs.vm_image }}" -O "$OUT" || wget -q "${{ inputs.vm_image }}" -O "$OUT" || curl -s -L "${{ inputs.vm_image }}" -o "$OUT" || cp "${{ inputs.vm_image }}" "$OUT" || echo "Failed to download or copy disk image"
 
         if [ ! -f "$OUT" ]; then
           echo "Failed to download or copy disk image"
