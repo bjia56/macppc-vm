@@ -1,0 +1,143 @@
+name: MacOS PowerPC VM Runner
+description: Action to execute commands within a MacOS PPC VM running on QEMU
+author: Brett Jia
+
+inputs:
+  commands:
+    description: Commands to run on the VM
+    required: true
+    default: uname -a
+  user:
+    description: User to run commands on the VM
+    required: true
+    default: macuser
+  vm_image:
+    description: Path or url to the MacOS PPC disk image, QCOW2 or QCOW2 compressed with xz
+    required: true
+    default: ''
+  ssh_key:
+    description: Base64 encoded private SSH key for accessing the VM
+    required: true
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        # Install dependencies
+        sudo apt-get update -qq > /dev/null
+        sudo apt-get install -y -qq qemu-system-ppc xvfb ssh python3 file > /dev/null
+        qemu-system-ppc --version
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Setup downloader
+      shell: bash
+      run: |
+        # Setup downloader
+        python -m pip install gdown
+
+    - name: Download disk
+      shell: bash
+      run: |
+        # Download disk image
+        OUT="${{ github.action_path }}/disk"
+        gdown --fuzzy "${{ inputs.vm_image }}" -O "$OUT" || wget "${{ inputs.vm_image }}" -O "$OUT" || curl -L "${{ inputs.vm_image }}" -o "$OUT" || cp "${{ inputs.vm_image }}" "$OUT" || echo "Failed to download or copy disk image"
+
+        if [ ! -f "$OUT" ]; then
+          echo "Failed to download or copy disk image"
+          exit 1
+        fi
+
+        # check if we need to decompress the image
+        FILE_OUTPUT=$(file "$OUT")
+        if [[ "$FILE_OUTPUT" == *XZ* ]]; then
+          echo "Decompressing xz image"
+          mkdir -p /tmp
+          xz -d -c "$OUT" > ${{ github.action_path }}/disk.qcow2
+        fi
+
+    - name: Boot VM
+      shell: bash
+      run: |
+        # Boot VM
+        mkdir -p ${{ github.action_path }}/runtime
+        export XDG_RUNTIME_DIR=${{ github.action_path }}/runtime
+        xvfb-run qemu-system-ppc -L pc-bios -M mac99,via=pmu -cpu G4 -m 1024 -prom-env 'auto-boot?=true' -prom-env 'boot-args=-v' -prom-env 'vga-ndrv?=true' -hda ${{ github.action_path }}/disk.qcow2 -device e1000,netdev=net0 -netdev user,id=net0,hostfwd=tcp::5555-:22 -boot c -no-reboot &
+
+    - name: Setup ssh
+      shell: bash
+      run: |
+        # Setup ssh
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        cat > ~/.ssh/config <<EOL
+        Host macppc
+            User ${{ inputs.user }}
+            HostName localhost
+            Port 5555
+            KexAlgorithms diffie-hellman-group-exchange-sha1,diffie-hellman-group1-sha1
+            HostKeyAlgorithms ssh-rsa,ssh-dss
+            PubkeyAcceptedKeyTypes ssh-rsa
+            IdentityFile ~/.ssh/id_rsa.macppc
+            StrictHostKeyChecking no
+        EOL
+        chmod 600 ~/.ssh/config
+
+        cat <<EOL | base64 -d > ~/.ssh/id_rsa.macppc
+        ${{ inputs.ssh_key }}
+        EOL
+        chmod 400 ~/.ssh/id_rsa.macppc
+
+    - name: Install custom shell
+      shell: bash
+      run: |
+        # Install custom shell
+        mkdir -p ~/.local/bin
+        cat > ~/.local/bin/macppc << EOL
+        #!/usr/bin/env sh
+        ssh ${{ inputs.user }}@macppc sh -l<\$1
+        EOL
+        chmod +x ~/.local/bin/macppc
+
+    - name: Wait for VM
+      shell: bash
+      run: |
+        # Wait for VM
+        wait_for_ssh() {
+          local HOST="macppc"
+          local INTERVAL=10
+          while true; do
+            if ! ssh -o ConnectTimeout=5 "${{ inputs.user }}@$HOST" date &> /dev/null ; then
+              echo "Waiting for SSH to become available for ${{ inputs.user }}@$HOST"
+              sleep $INTERVAL
+            else
+              echo "SSH is now available on $HOST."
+              return 0
+            fi
+          done
+        }
+        wait_for_ssh
+
+    - name: Initial setup
+      shell: bash
+      run: |
+        # Initial setup
+        cat <<- "MACPPCSCRIPT" | ssh root@macppc /bin/bash
+        sysctl -w kern.maxproc=1024
+        sysctl -w kern.maxprocperuid=512
+        MACPPCSCRIPT
+
+    - name: Run commands
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        # Run commands
+        cat <<- "MACPPCSCRIPT" | ssh ${{ inputs.user }}@macppc /bin/bash
+        ${{ inputs.commands }}
+        MACPPCSCRIPT
