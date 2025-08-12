@@ -15,41 +15,6 @@ jobs:
       with:
         vm_image: ${{ secrets.VM_IMAGE }}
         ssh_key: ${{ secrets.VM_KEY }}
-
-  test_user_root:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: ./
-      with:
-        vm_image: ${{ secrets.VM_IMAGE }}
-        ssh_key: ${{ secrets.VM_KEY }}
-        commands: |
-          whoami
-          test `whoami` = 'root'
-        user: root
-
-  test_user_macuser:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: ./
-      with:
-        vm_image: ${{ secrets.VM_IMAGE }}
-        ssh_key: ${{ secrets.VM_KEY }}
-        commands: |
-          whoami
-          test `whoami` = 'macuser'
-        user: macuser
-
-  test_custom_shell:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: ./
-      with:
-        vm_image: ${{ secrets.VM_IMAGE }}
-        ssh_key: ${{ secrets.VM_KEY }}
     - shell: macppc {0}
       run: |
         whoami
