@@ -15,6 +15,7 @@ jobs:
     - uses: ./
       with:
         vm_image: ${{ secrets.VM_IMAGE }}
+        vm_image_sha256: ${{ secrets.VM_IMAGE_SHA256 }}
         ssh_key: ${{ secrets.VM_KEY }}
     - shell: macppc {0}
       run: |

@@ -15,6 +15,10 @@ inputs:
     description: Path or url to the MacOS PPC disk image, QCOW2 or QCOW2 compressed with xz
     required: true
     default: ''
+  vm_image_sha256:
+    description: Optional sha256 checksum of the disk image to verify after download
+    required: false
+    default: ''
   ssh_key:
     description: Base64 encoded private SSH key for accessing the VM
     required: true
@@ -52,6 +56,15 @@ runs:
         if [ ! -f "$OUT" ]; then
           echo "Failed to download or copy disk image"
           exit 1
+        fi
+
+        # verify checksum if provided
+        if [ -n "${{ inputs.vm_image_sha256 }}" ]; then
+          echo "${{ inputs.vm_image_sha256 }}  $OUT" | sha256sum --check --
+          if [ $? -ne 0 ]; then
+            echo "Checksum verification failed"
+            exit 1
+          fi
         fi
 
         # check if we need to decompress the image
