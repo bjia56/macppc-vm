@@ -59,7 +59,7 @@ runs:
         if [[ "$FILE_OUTPUT" == *XZ* ]]; then
           echo "Decompressing xz image"
           mkdir -p /tmp
-          xz -d -c "$OUT" > ${{ github.action_path }}/disk.qcow2
+          xz -d -T0 -c "$OUT" > ${{ github.action_path }}/disk.qcow2
         fi
 
     - name: Boot VM
