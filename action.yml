@@ -63,9 +63,9 @@ runs:
 
           # Download from S3
           if [ -n "${{ inputs.s3_endpoint_url }}" ]; then
-            aws s3 cp "${{ inputs.vm_image }}" "$OUT" --endpoint-url "${{ inputs.s3_endpoint_url }}"
+            aws s3 cp "${{ inputs.vm_image }}" "$OUT" --endpoint-url "${{ inputs.s3_endpoint_url }}" --quiet
           else
-            aws s3 cp "${{ inputs.vm_image }}" "$OUT"
+            aws s3 cp "${{ inputs.vm_image }}" "$OUT" --quiet
           fi
         else
           # Download via wget
