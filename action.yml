@@ -23,6 +23,18 @@ inputs:
     description: Base64 encoded private SSH key for accessing the VM
     required: true
     default: ''
+  aws_access_key_id:
+    description: AWS Access Key ID for S3 access
+    required: false
+    default: ''
+  aws_secret_access_key:
+    description: AWS Secret Access Key for S3 access
+    required: false
+    default: ''
+  s3_endpoint_url:
+    description: Custom S3 endpoint URL (e.g., for S3-compatible services)
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -32,7 +44,7 @@ runs:
       run: |
         # Install dependencies
         sudo apt-get update -qq > /dev/null
-        sudo apt-get install -y -qq qemu-system-ppc xvfb ssh file > /dev/null
+        sudo apt-get install -y -qq qemu-system-ppc xvfb ssh file awscli > /dev/null
         qemu-system-ppc --version
 
     - name: Download disk
@@ -40,14 +52,31 @@ runs:
       run: |
         # Download disk image
         OUT="${{ github.action_path }}/disk"
-        wget -q "${{ inputs.vm_image }}" -O "$OUT" || cp "${{ inputs.vm_image }}" "$OUT"
+
+        if [[ "${{ inputs.vm_image }}" == s3://* ]]; then
+          # Configure AWS credentials if provided
+          if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -n "${{ inputs.aws_secret_access_key }}" ]; then
+            export AWS_ACCESS_KEY_ID="${{ inputs.aws_access_key_id }}"
+            export AWS_SECRET_ACCESS_KEY="${{ inputs.aws_secret_access_key }}"
+          fi
+
+          # Download from S3
+          if [ -n "${{ inputs.s3_endpoint_url }}" ]; then
+            aws s3 cp "${{ inputs.vm_image }}" "$OUT" --endpoint-url "${{ inputs.s3_endpoint_url }}"
+          else
+            aws s3 cp "${{ inputs.vm_image }}" "$OUT"
+          fi
+        else
+          # Download via wget
+          wget -q "${{ inputs.vm_image }}" -O "$OUT"
+        fi
 
         if [ ! -f "$OUT" ]; then
           echo "Failed to download or copy disk image"
           exit 1
         fi
 
-        # verify checksum if provided
+        # Verify checksum if provided
         if [ -n "${{ inputs.vm_image_sha256 }}" ]; then
           echo "${{ inputs.vm_image_sha256 }}  $OUT" | sha256sum --check --
           if [ $? -ne 0 ]; then
@@ -56,11 +85,9 @@ runs:
           fi
         fi
 
-        # check if we need to decompress the image
+        # Check if we need to decompress the image
         FILE_OUTPUT=$(file "$OUT")
         if [[ "$FILE_OUTPUT" == *XZ* ]]; then
-          echo "Decompressing xz image"
-          mkdir -p /tmp
           xz -d -T0 -c "$OUT" > ${{ github.action_path }}/disk.qcow2
         fi
 
