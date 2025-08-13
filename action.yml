@@ -45,7 +45,7 @@ runs:
         # Install dependencies
         sudo apt-get update -qq > /dev/null
         sudo apt-get install -y -qq qemu-system-ppc xvfb ssh file xz-utils > /dev/null
-        sudo apt-get install -y -qq awscli || sudo snap install awscli > /dev/null
+        sudo apt-get install -y -qq awscli || sudo snap install aws-cli --classic > /dev/null
         qemu-system-ppc --version
 
     - name: Download disk
